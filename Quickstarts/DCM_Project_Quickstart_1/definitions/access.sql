@@ -1,12 +1,12 @@
 define warehouse DCM_PROJECT_WH_{{env_suffix}}
 with 
-    warehouse_type = STANDARD_GEN_1
     warehouse_size = '{{wh_size}}'
     auto_suspend = 300
     comment = 'For Quickstart Demo of DCM Projects PrPr'
 ;
 
 define database role DCM_PROJECT_{{env_suffix}}.{{env_suffix}}_ADMIN;
+grant database role DCM_PROJECT_{{env_suffix}}.{{env_suffix}}_ADMIN to role {{project_owner_role}};
 
 define role DCM_PROJECT_{{env_suffix}}_READ;
 

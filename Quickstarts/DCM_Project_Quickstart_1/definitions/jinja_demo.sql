@@ -13,7 +13,7 @@
     
     grant role {{ team }}_USAGE to role {{ team }}_DEVELOPER;
     grant role {{ team }}_DEVELOPER to role {{ team }}_OWNER;
-    -- grant role {{ team }}_OWNER to role {{ project_owner_role }};
+    grant role {{ team }}_OWNER to role {{ project_owner_role }};
     -- ensure that the DCM still holds all roles it transfers ownership to to avoid lock-out 
     
 {% endmacro %}

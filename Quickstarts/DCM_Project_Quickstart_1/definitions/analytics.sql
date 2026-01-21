@@ -19,7 +19,7 @@ select
     c.CUSTOMER_ID,
     c.FIRST_NAME,
     c.LAST_NAME,
-    c.CITY as CUSTOMER_CITY, 
+    initcap(c.CITY) as CUSTOMER_CITY, 
     t.TRUCK_ID,
     t.TRUCK_BRAND_NAME
 from
@@ -36,6 +36,13 @@ join
 join 
     DCM_PROJECT_{{env_suffix}}.RAW.TRUCK t 
     on oh.TRUCK_ID = t.TRUCK_ID
+qualify row_number() over (
+    partition by 
+        oh.ORDER_ID, 
+        m.MENU_ITEM_NAME 
+    order by 
+        oh.ORDER_TS desc
+    ) = 1
 ;
 
 
