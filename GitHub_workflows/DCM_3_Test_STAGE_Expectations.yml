@@ -1,4 +1,4 @@
-name: ❄️ DCM TEST Stage
+name: ❄️ DCM - Test Expectations on Stage
 
 on:     
   workflow_dispatch:

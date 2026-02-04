@@ -29,6 +29,8 @@ jobs:
 
     - name: Setup SnowCLI
       uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands
         
     - name:  Verify SnowCLI version
       run: |
@@ -51,6 +53,8 @@ jobs:
       
     - name: Setup SnowCLI
       uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands
         
     - name: Setup yaml parser
       uses: mikefarah/yq@v4

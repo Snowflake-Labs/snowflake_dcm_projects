@@ -44,6 +44,8 @@ jobs:
                 
     - name: Setup SnowCLI
       uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands
       
     - name: Execute PLAN against STAGE and summarize output
       id: stage_plan
@@ -146,6 +148,8 @@ jobs:
         
     - name: Setup SnowCLI
       uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands
       
     - name: Execute DEPLOY with STAGE config
       run: |        
@@ -175,7 +179,9 @@ jobs:
     steps:
     - name: Setup SnowCLI
       uses: snowflakedb/snowflake-cli-action@v2.0
-      
+      with:
+        custom-github-ref: dcm-pipeline-commands
+        
     - name: Clone Repo
       uses: actions/checkout@v4
     
@@ -306,7 +312,9 @@ jobs:
         
     - name: Setup SnowCLI
       uses: snowflakedb/snowflake-cli-action@v2.0
-      
+      with:
+        custom-github-ref: dcm-pipeline-commands
+        
     - name: Execute PLAN against PROD and summarize output
       id: prod_plan
       run: |        
@@ -409,6 +417,8 @@ jobs:
         
     - name: Setup SnowCLI
       uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands
       
     - name: Execute DEPLOY with PROD config
       run: |        
@@ -436,6 +446,8 @@ jobs:
     steps:
     - name: Setup SnowCLI
       uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands
       
     - name: Clone Repo
       uses: actions/checkout@v4
