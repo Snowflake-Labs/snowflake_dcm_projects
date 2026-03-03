@@ -52,3 +52,11 @@ If the plan was successful and the plan output matches the expected changes, the
 - `snow dcm test`
 - `snow dcm preview --target DEV --object DCM_PROJECT_DEV.SERVE.V_DASHBOARD_SALES_BY_CATEGORY_CITY`
 - `snow dcm drop`
+
+
+## Try out the DCM Skills for Cortex Code CLI
+
+- Install Cortex Code CLI (see https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code-cli)
+- Start Cortex Code in your terminal
+- Ask Cortex Code to add the DCM skill from https://github.com/Snowflake-Labs/snowflake_dcm_projects/cortex_code_skills/dcm
+- Once the skill is loaded, you can ask Cortex to create, debug, improve or describe DCM projects 
