@@ -52,33 +52,36 @@ For ALL DCM operations, you MUST collect:
    - The named connection to use for all operations
    - Ask user if not provided (or use default connection if not specified)
 
-3. **Configuration Name** (if the project uses configurations)
-   - Check `manifest.yml` for available configurations (DEV, PROD, etc.)
-   - Required for `analyze`, `plan`, `preview`, and `deploy` commands when configurations exist
+3. **Target Name** (if the project uses targets)
+   - Check `manifest.yml` for available targets (DEV, PROD, etc.)
+   - The `--target` flag selects a target from the manifest, which bundles the project identifier with a templating configuration
+   - If omitted, the `default_target` from the manifest is used
 
 **DO NOT PROCEED until you have confirmed these details with the user.**
 
 ## Intent Detection
 
-When a user makes a request, detect their intent and follow the appropriate workflow:
+When a user makes a request, detect their intent and follow the appropriate workflow.
+
+**⚠️ MANDATORY SUB-SKILL LOADING**: When an intent below maps to a sub-skill file (marked with ✋ MUST Load), you **MUST** load that sub-skill file before doing any work. The inline workflow summaries later in this document are overviews only — they are **NOT sufficient** to complete the task correctly. The sub-skills contain critical details, examples, and guardrails that prevent common errors. **DO NOT** skip loading the sub-skill and attempt to follow only the inline workflow.
 
 ### CREATE Intent - User wants to create a new DCM project
 
 **Trigger phrases**: "create project", "new project", "set up DCM", "start from scratch", "build infrastructure"
 
-**→ Load**: [create-project/SKILL.md](create-project/SKILL.md)
+**→ ✋ MUST Load**: [create-project/SKILL.md](create-project/SKILL.md) — DO NOT write any files or run commands until this sub-skill is loaded.
 
 ### MODIFY_LOCAL Intent - User wants to modify an existing project with local source code
 
 **Trigger phrases**: "modify", "update", "change", "add table", "edit definitions" (when source files are available locally)
 
-**→ Load**: [modify-project/SKILL.md](modify-project/SKILL.md)
+**→ ✋ MUST Load**: [modify-project/SKILL.md](modify-project/SKILL.md) — DO NOT modify definitions until this sub-skill is loaded.
 
 ### DOWNLOAD_AND_MODIFY Intent - User wants to work with an existing deployed project (no local code)
 
 **Trigger phrases**: "download project", "get sources", "work with existing project", "modify deployed project"
 
-**→ Load**: [modify-project/SKILL.md](modify-project/SKILL.md) (includes download workflow)
+**→ ✋ MUST Load**: [modify-project/SKILL.md](modify-project/SKILL.md) (includes download workflow) — DO NOT download or modify until this sub-skill is loaded.
 
 ### ANALYZE Intent - User wants to understand dependencies or check for errors
 
@@ -90,169 +93,36 @@ When a user makes a request, detect their intent and follow the appropriate work
 
 **Trigger phrases**: "import existing", "adopt objects", "bring into DCM", "convert to DCM", "add existing table"
 
-**→ Follow**: [Adopting Existing Objects Workflow](#adopting-existing-objects)
+**→ Follow**: [Adopting Existing Objects Workflow](#workflow-5-adopting-existing-objects)
 
 ### ROLE_GRANT_GUIDELINES Intent - User needs guidance on roles/grants in DCM
 
 **Trigger phrases**: "dcm role", "dcm grant", "roles in dcm", "grants in dcm project", "dcm permission model", "dcm warehouse grant error", "define roles in dcm"
 
-**→ Load**: [dcm-roles-and-grants/SKILL.md](dcm-roles-and-grants/SKILL.md)
+**→ ✋ MUST Load**: [dcm-roles-and-grants/SKILL.md](dcm-roles-and-grants/SKILL.md) — DO NOT give grant advice until this sub-skill is loaded.
 
 ### DEPLOY Intent - User wants to deploy changes
 
 **Trigger phrases**: "deploy", "apply changes", "push to Snowflake"
 
-**→ Load**: [deploy-project/SKILL.md](deploy-project/SKILL.md)
+**→ ✋ MUST Load**: [deploy-project/SKILL.md](deploy-project/SKILL.md) — DO NOT run plan or deploy commands until this sub-skill is loaded.
 
 ## Core Workflows
 
 ### Workflow 1: Create New Project
 
-```
-User wants NEW project
-    ↓
-1. Gather project details:
-   - Target identifier (DATABASE.SCHEMA.PROJECT_NAME)
-   - Connection name
-   - What infrastructure to create (databases, tables, views, tasks, etc.)
-    ↓
-2. Verify database/schema exist (or prompt user to create them)
-    ↓
-2.5. ⚠️ MANDATORY: Analyze Roles/Grants (if any mentioned)
-   - If user mentions roles, grants, permissions, or warehouse access:
-     → **Load** [dcm-roles-and-grants/SKILL.md](dcm-roles-and-grants/SKILL.md)
-   - Categorize grants by DCM support level
-   - Identify warehouse grants (need account role workaround)
-   - Present analysis and get user approval BEFORE writing definitions
-    ↓
-3. Create DCM project in Snowflake:
-   snow dcm create <identifier> -c <connection>
-    ↓
-4. Create local project structure:
-   - manifest.yml
-   - definitions/ folder
-   - Definition files (.sql)
-    ↓
-5. Clarify with user:
-   - Object names
-   - Column definitions
-   - Relationships and dependencies
-   - Configuration variables (if multi-environment)
-    ↓
-6. Write definition files with DEFINE statements
-    ↓
-7. Run analyze to validate:
-   snow dcm analyze <identifier> -c <connection> --output-path ./out/analyze
-    ↓
-8. Fix any errors found during analysis
-    ↓
-9. Ask user if ready to proceed to plan/deploy
-```
-
-**Key Steps:**
-
-1. **Confirm project identifier**: Always use fully qualified names (DATABASE.SCHEMA.PROJECT_NAME)
-
-2. **Check prerequisites**: Verify the target database and schema exist:
-
-   ```sql
-   SHOW DATABASES LIKE '<database>';
-   SHOW SCHEMAS IN DATABASE <database> LIKE '<schema>';
-   ```
-
-3. **Create the DCM project**:
-
-   ```bash
-   snow dcm create <DATABASE.SCHEMA.PROJECT_NAME> -c <connection>
-   ```
-
-4. **Create project structure** using the recommended layout:
-
-   ```
-   project/
-   ├── manifest.yml
-   └── definitions/
-       ├── infrastructure.sql
-       ├── tables.sql
-       ├── analytics.sql
-       └── access.sql
-   ```
-
-5. **Create manifest.yml** — use ONLY the fields shown below (see [reference/project_structure.md](reference/project_structure.md) for full schema):
-
-   ```yaml
-   manifest_version: 1
-   include_definitions:
-     - definitions/.*
-   type: DCM_PROJECT
-
-   # Optional: configurations for multi-environment
-   configurations:
-     DEV:
-       db: "DEV"
-       wh_size: "X-SMALL"
-     PROD:
-       db: "PROD"
-       wh_size: "LARGE"
-   ```
-   
-   > **Note:** Deployment target is specified via CLI (`snow dcm plan DB.SCHEMA.PROJECT --target dev`), not in the manifest.
+This workflow is fully documented in [create-project/SKILL.md](create-project/SKILL.md).
+You **MUST** load that sub-skill before writing any files or running commands.
 
 ### Workflow 2: Modify Existing Project
 
-```
-User has LOCAL source code
-    ↓
-1. Identify the project:
-   - Read manifest.yml to understand structure
-   - Identify target DCM project identifier
-   - Identify configuration to use (if any)
-    ↓
-2. Understand current state:
-   - Read existing definition files
-   - Run analyze to see current objects and dependencies
-    ↓
-3. Clarify changes with user:
-   - What to add/modify/remove?
-   - Confirm object names, columns, properties
-    ↓
-4. Make changes to definition files
-    ↓
-5. Run analyze to validate:
-   snow dcm analyze <identifier> -c <connection> --configuration <config> --output-path ./out/analyze
-    ↓
-6. Fix any errors
-    ↓
-7. Run plan to preview changes:
-   snow dcm plan <identifier> -c <connection> --configuration <config> --output-path ./out/plan
-    ↓
-8. Present plan summary to user (CREATE/ALTER/DROP counts)
-    ↓
-9. Offer preview of specific objects (if applicable)
-    ↓
-10. Proceed to deploy ONLY with explicit user confirmation
-```
+This workflow is fully documented in [modify-project/SKILL.md](modify-project/SKILL.md).
+You **MUST** load that sub-skill before modifying any definitions.
 
 ### Workflow 3: Download and Modify Existing Project
 
-```
-User wants to work with DEPLOYED project (no local code)
-    ↓
-1. List ALL available projects (use --database "" to see all):
-   snow dcm list -c <connection> --database ""
-    ↓
-2. Help user select project or use provided name
-    ↓
-3. Describe project:
-   snow dcm describe <identifier> -c <connection>
-    ↓
-4. Download sources using script:
-   bash <skill-dir>/scripts/download_project.sh <project_name> \
-     --connection <connection> \
-     --target <local_folder>
-    ↓
-5. Proceed with Workflow 2 (Modify Existing Project)
-```
+This workflow is fully documented in [modify-project/SKILL.md](modify-project/SKILL.md) (includes the download workflow).
+You **MUST** load that sub-skill before downloading or modifying any project.
 
 ### Workflow 4: Analyze Project
 
@@ -260,11 +130,10 @@ User wants to work with DEPLOYED project (no local code)
 User wants to understand dependencies or validate
     ↓
 1. Run analyze:
-   snow dcm analyze <identifier> -c <connection> \
-     --configuration <config> \
-     --output-path ./out/analyze
+   snow dcm raw-analyze <identifier> -c <connection> \
+     --target <config> 
     ↓
-2. ⚠️ CRITICAL: Read and parse out/analyze/analyze_output.json
+2. ⚠️ CRITICAL: Read and parse command output
    - This step is MANDATORY, not optional
    - Check for errors at file and definition levels
    - Extract dependency information
@@ -321,10 +190,10 @@ User wants to import existing Snowflake objects into DCM
    - POST_HOOK objects → in ATTACH POST_HOOK blocks
    - Unsupported grants → post_deployment_grants.sql
     ↓
-5. Run analyze and READ out/analyze/analyze_output.json:
+5. Run analyze and READ command output:
    - Verify objects appear in definitions
     ↓
-6. Run plan and READ out/plan/plan_metadata.json:
+6. Run plan and READ out/plan_result.json:
    - ⚠️ VERIFY: Plan should show ZERO changes for adopted objects
    - If plan shows CREATE/ALTER, the definition doesn't match
    - Adjust definition to match existing object exactly
@@ -336,50 +205,10 @@ User wants to import existing Snowflake objects into DCM
 
 ### Workflow 6: Deploy Changes
 
-⚠️ **CRITICAL: NEVER DEPLOY WITHOUT PLAN AND USER CONFIRMATION**
+This workflow is fully documented in [deploy-project/SKILL.md](deploy-project/SKILL.md).
+You **MUST** load that sub-skill before running plan or deploy commands.
 
-```
-User wants to deploy
-    ↓
-1. MUST have run analyze successfully first
-    ↓
-2. Check if plan output already exists:
-   - If out/plan/plan_metadata.json exists and is current:
-     → READ the existing file instead of rerunning
-   - Only rerun plan if explicitly requested or definitions changed
-    ↓
-3. ⚠️ CRITICAL: Read and parse out/plan/plan_metadata.json
-   - Check status: SUCCESS or PLAN_FAILED
-   - If PLAN_FAILED → Report error, do NOT proceed
-   - Parse operations array to understand all changes
-    ↓
-4. Present plan summary:
-   📊 Plan Summary:
-   ✅ CREATE: X objects (list types)
-   ⚠️  ALTER: Y objects (highlight data-affecting changes)
-   🚨 DROP: Z objects (EMPHASIZE destructive operations)
-    ↓
-5. Ask user: "Would you like to preview any specific objects?"
-   - If yes, use: snow dcm preview <identifier> -c <connection> --object <fqn> --limit 10
-    ↓
-6. WAIT FOR EXPLICIT USER CONFIRMATION
-   ⚠️ You are about to deploy changes to Snowflake.
-   This will affect database: <database>
-   Using connection: <connection>
-
-   Are you sure you want to proceed? (yes/no)
-    ↓
-7. Only if user confirms, deploy:
-   snow dcm deploy <identifier> -c <connection> \
-     --configuration <config> \
-     --alias "<descriptive-alias>"
-    ↓
-8. Check if project has tests (from analyze output)
-   - If tests exist, ask: "Would you like to run data quality tests?"
-   - If yes:
-     snow dcm refresh <identifier> -c <connection>  # Refresh dynamic tables first
-     snow dcm test <identifier> -c <connection> --output-path ./out/test
-```
+⚠️ **CRITICAL: NEVER deploy without running plan first and getting explicit user confirmation.**
 
 ## Workflow Decision Tree
 
@@ -392,15 +221,15 @@ Gather: Project identifier, Connection, Configuration
     ↓
 Detect User Intent
     ↓
-    ├─→ CREATE → Load create-project/SKILL.md
+    ├─→ CREATE → ✋ MUST Load create-project/SKILL.md BEFORE writing any files
     │   (Triggers: "create project", "new project", "set up DCM")
     │   ⚠️ If roles/grants/permissions mentioned:
-    │      → ALSO load dcm-roles-and-grants/SKILL.md
+    │      → ALSO MUST load dcm-roles-and-grants/SKILL.md
     │
-    ├─→ MODIFY_LOCAL → Load modify-project/SKILL.md
+    ├─→ MODIFY_LOCAL → ✋ MUST Load modify-project/SKILL.md BEFORE modifying
     │   (Triggers: "modify", "update", "add table" with local files)
     │
-    ├─→ DOWNLOAD_AND_MODIFY → Load modify-project/SKILL.md (includes download)
+    ├─→ DOWNLOAD_AND_MODIFY → ✋ MUST Load modify-project/SKILL.md BEFORE downloading
     │   (Triggers: "download project", "get sources", "work with existing")
     │
     ├─→ IMPORT_EXISTING → Follow Adopting Existing Objects workflow
@@ -409,15 +238,15 @@ Detect User Intent
     │   → ALWAYS load dcm-roles-and-grants/SKILL.md for grant analysis
     │   → Verify plan shows zero changes for adopted objects
     │
-    ├─→ ROLE_GRANT_GUIDELINES → Load dcm-roles-and-grants/SKILL.md
+    ├─→ ROLE_GRANT_GUIDELINES → ✋ MUST Load dcm-roles-and-grants/SKILL.md
     │   (Triggers: "dcm role", "dcm grant", "roles in dcm", "dcm permission model")
     │   → Recommended patterns for roles and grants in DCM
     │
     ├─→ ANALYZE → Run analyze workflow
     │   (Triggers: "analyze", "check dependencies", "lineage")
-    │   ⚠️ MUST read out/analyze/analyze_output.json after running
+    │   ⚠️ MUST read command output after running
     │
-    └─→ DEPLOY → Load deploy-project/SKILL.md
+    └─→ DEPLOY → ✋ MUST Load deploy-project/SKILL.md BEFORE running plan/deploy
         (Triggers: "deploy", "apply changes")
             ↓
         ALWAYS: analyze → plan → READ OUTPUT FILES → user confirmation → deploy
@@ -464,8 +293,7 @@ snow dcm <command> <identifier> -c <connection> [options]
 
 **Common options:**
 
-- `--configuration <name>`: Use specific configuration from manifest.yml
-- `--output-path <path>`: Save command output to local directory
+- `--target <name>`: Use specific target from manifest.yml (bundles project identifier + templating config)
 - `--format json`: Get machine-readable output (for list commands)
 
 ### Definition Syntax Rules
@@ -501,10 +329,9 @@ snow dcm <command> <identifier> -c <connection> [options]
 
 ### ⚠️ CRITICAL: Reading Output Files
 
-**After running `analyze` or `plan`, you MUST read and parse the output JSON files:**
+**After running `plan`, you MUST read and parse the output JSON files:**
 
-- `out/analyze/analyze_output.json` - after analyze
-- `out/plan/plan_metadata.json` - after plan
+- `out/plan_result.json` - after plan
 
 **This is MANDATORY, not optional.** The agent must:
 
@@ -538,7 +365,7 @@ snow dcm <command> <identifier> -c <connection> [options]
    - Present proposed definitions to user
    - Wait for approval before writing files
 
-3. **Use appropriate file organization**:
+3. **Use appropriate file organization** (all files go in `sources/definitions/`):
    - `infrastructure.sql`: Databases, schemas, warehouses, **internal stages**
    - `tables.sql` or `raw.sql`: Table definitions
    - `analytics.sql`: Dynamic tables, transformations
@@ -579,9 +406,11 @@ When a user wants to "import" or "adopt" existing Snowflake objects:
 
 ### Multi-Environment Setup
 
-1. Define configurations in manifest.yml (DEV, PROD)
-2. Use Jinja variables in definitions: `{{env}}`, `{{wh_size}}`
-3. Use `--configuration` flag with all commands
+1. Define targets in manifest.yml (DEV, PROD) with corresponding `templating` configurations
+2. Use Jinja variables in definitions: `{{env_suffix}}`, `{{wh_size}}`
+3. Use `--target` flag to select the target (which resolves both project identifier and templating config)
+4. Use `templating.defaults` for shared values and configurations for overrides
+5. Use Jinja dictionaries for per-resource configuration (e.g., team-specific warehouse sizes, retention policies)
 
 ### Inspecting dbt Pipelines
 

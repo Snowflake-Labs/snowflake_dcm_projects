@@ -13,7 +13,7 @@ This sub-skill guides you through modifying an existing DCM project, whether you
 
 ### Scenario A: Local Source Code Available
 
-If the user has source code locally (manifest.yml and definitions/ folder):
+If the user has source code locally (manifest.yml and sources/definitions/ folder):
 
 - Proceed directly to [Understand Current State](#step-1-understand-current-state)
 
@@ -51,9 +51,9 @@ If the user wants to work with a deployed project but doesn't have the source:
 
 **Read the manifest.yml:**
 
-- What include patterns are used?
-- What configurations exist?
-- Note any template variables used
+- What targets are defined?
+- What templating configurations exist?
+- Note any template variables used (under `templating.defaults` and `templating.configurations`)
 
 **Read existing definition files:**
 
@@ -64,9 +64,8 @@ If the user wants to work with a deployed project but doesn't have the source:
 **Run analyze to get the full picture:**
 
 ```bash
-snow dcm analyze <identifier> -c <connection> \
-    --configuration <config> \
-    --output-path ./out/analyze
+snow dcm raw-analyze <identifier> -c <connection> \
+    --target <target>
 ```
 
 **From analyze output, understand:**
@@ -148,16 +147,14 @@ Do you approve these changes?
 ### Step 5: Validate with Analyze
 
 ```bash
-snow dcm analyze <identifier> -c <connection> \
-    --configuration <config> \
-    --output-path ./out/analyze
+snow dcm raw-analyze <identifier> -c <connection> \
+    --target <target> 
 ```
 
-#### ⚠️ CRITICAL: Read and Parse the Output
+#### ⚠️ CRITICAL: Read and Parse the Output 
 
-**You MUST read and parse `out/analyze/analyze_output.json`.**
+**You MUST read and parse output that is returned by the command.**
 
-For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output Files](../SKILL.md#️-critical-reading-output-files)
 
 **Fix any errors before proceeding.**
 
@@ -165,15 +162,15 @@ For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output File
 
 ```bash
 snow dcm plan <identifier> -c <connection> \
-    --configuration <config> \
-    --output-path ./out/plan
+    --target <target> \
+    --save-output
 ```
 
 #### ⚠️ CRITICAL: Read and Parse the Output
 
-**You MUST read and parse `out/plan/plan_metadata.json`.**
+**You MUST read and parse `out/plan_result.json`.**
 
-For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output Files](../SKILL.md#️-critical-reading-output-files)
+For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output Files](../SKILL.md#critical-reading-output-files)
 
 **If plan output already exists** and user asks for a summary:
 
@@ -187,7 +184,7 @@ For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output File
 ```
 📊 Plan Summary for <identifier>
 
-Configuration: <config_name>
+Target: <target_name>
 
 ✅ CREATE (X objects):
    - TABLE: MY_DB.RAW.NEW_TABLE
@@ -221,7 +218,7 @@ Configuration: <config_name>
 If yes, use:
 
 ```bash
-snow dcm preview <identifier> -c <connection> \
+snow dcm preview -c <connection> \
     --object <fully.qualified.object.name> \
     --limit 10
 ```
@@ -302,7 +299,7 @@ DEFINE TABLE MY_DB.RAW.CUSTOMERS (
 
    ```bash
    # Use analyze output to find what depends on this object
-   snow dcm analyze <identifier> -c <connection> --output-path ./out/analyze
+   snow dcm raw-analyze <identifier> -c <connection>
    # Review dependencies in the output
    ```
 
@@ -409,7 +406,7 @@ Grants
 Use analyze output to understand column-level lineage:
 
 ```bash
-snow dcm analyze <identifier> -c <connection> --output-path ./out/analyze
+snow dcm raw-analyze <identifier> -c <connection>
 ```
 
 The output includes:

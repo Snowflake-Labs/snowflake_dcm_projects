@@ -116,6 +116,7 @@ Provides detailed description of a DCM project. Useful to help the user understa
 snow dcm describe <name> -c <connection>
 ```
 
+
 #### Arguments
 
 | Argument | Required | Description                       |
@@ -130,7 +131,7 @@ snow dcm describe MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection
 
 ---
 
-### `snow dcm analyze`
+### `snow dcm raw-analyze`
 
 Performs static analysis on a DCM project, including:
 
@@ -142,8 +143,9 @@ Performs static analysis on a DCM project, including:
 #### Syntax
 
 ```bash
-snow dcm analyze <identifier> -c <connection> [options]
+snow dcm raw-analyze <identifier> -c <connection> [options]
 ```
+
 
 #### Arguments
 
@@ -155,66 +157,25 @@ snow dcm analyze <identifier> -c <connection> [options]
 
 | Option            | Short | Description                                                                                   |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------- |
-| `--configuration` |       | Configuration from `manifest.yml` to use                                                      |
-| `--output-path`   |       | Path to write analysis artifacts. Use local directory where the analyze result will be stored |
+| `--target` |       | Target from `manifest.yml` to use (bundles project identifier + templating config)            |
 
 #### Examples
 
 ```bash
 # Analyze from current directory
-snow dcm analyze MY_PROJECT -c myconnection
+snow dcm raw-analyze MY_PROJECT -c myconnection
 
-# Analyze with a specific configuration
-snow dcm analyze MY_PROJECT -c myconnection --configuration DEV
-
-# Analyze and save output to a local directory
-snow dcm analyze MY_PROJECT -c myconnection --output-path ./out/analyze
+# Analyze with a specific target
+snow dcm raw-analyze MY_PROJECT -c myconnection --target DEV
 ```
-
-#### Recommended Output Path
-
-Use `<project_root>/out/analyze` as the output path to store analysis artifacts in a consistent location.
-
-#### Understanding Analyze Output
-
-When `--output-path` is specified, the analyze command produces artifacts including:
-
-1. **Rendered SQL files**: Jinja templates compiled to SQL
-2. **Analysis JSON**: A structured file containing:
-
-**File-level information:**
-
-- `sourcePath`: Path to the source file
-- `definitions`: Array of object definitions found in the file
-- `errors`: Array of errors encountered during analysis
-
-**Definition structure:**
-Each definition includes:
-
-- `id`: Object identifier with `domain`, `database`, `schema`, and `name`
-- `sourcePosition`: Line/column in original source
-- `renderedPosition`: Line/column in rendered output
-- `dependencies`: Array of dependencies (other objects this definition depends on)
-- `errors`: Array of errors specific to this definition
-- `refinedDomain`: Specific object type (e.g., `table`, `view`, `dynamic_table`, `grant`)
-- `columns`: For relation definitions (tables/views), array of column information including:
-  - `name`: Column name
-  - `dataType`: Data type (optional, may be unknown after partial analysis)
-  - `lineage`: Array of column-level dependencies
-
-**Error structure:**
-
-- `message`: Human-readable error description
-- `sourcePosition`: Position in original source (optional)
-- `renderedPosition`: Position in rendered output (optional)
 
 #### ⚠️ CRITICAL: Reading and Parsing Analyze Output
 
-**After running `analyze`, you MUST read and parse `out/analyze/analyze_output.json` to verify the results.**
+**After running `analyze`, you MUST read and parse the output that is returned by the command.**
 
 This is NOT optional. The agent MUST:
 
-1. **Read the file**: `out/analyze/analyze_output.json`
+1. **Read the output**: the output that is returned by the command.
 2. **Parse the JSON** and check:
    - Are there any errors at the file level (`errors` array)?
    - Are there any errors at the definition level (each definition's `errors` array)?
@@ -225,7 +186,7 @@ This is NOT optional. The agent MUST:
 **Example verification:**
 
 ```
-After running analyze, I read out/analyze/analyze_output.json:
+After running analyze, I read the output that is returned by the command:
 - Found 5 definitions: 2 tables, 2 dynamic tables, 1 view
 - No errors detected at file or definition level
 - Dependencies resolved successfully
@@ -238,7 +199,7 @@ After running analyze, I read out/analyze/analyze_output.json:
 3. **Explore dependencies**: Use the dependency information to understand object relationships
 4. **Investigate lineage**: For data quality and impact analysis, examine column-level lineage
 5. **Encourage exploration**: Suggest users examine the rendered SQL to understand transformations
-6. Since analyze output contains rendered jinja, it will also contain definitions folder that will match manifest.yml include_definitions pattern causing failures. The agent should remove the output folder before running the analyze command.
+6. Since analyze output contains rendered jinja, it will also contain a definitions folder in the output that may cause confusion. The agent should remove the output folder before running the analyze command.
 
 ---
 
@@ -252,6 +213,7 @@ Generates a detailed plan showing what changes will be made to Snowflake infrast
 snow dcm plan <identifier> -c <connection> [options]
 ```
 
+
 #### Arguments
 
 | Argument     | Required | Description                       |
@@ -262,25 +224,22 @@ snow dcm plan <identifier> -c <connection> [options]
 
 | Option            | Short | Description                                                                         |
 | ----------------- | ----- | ----------------------------------------------------------------------------------- |
-| `--configuration` |       | Configuration from `manifest.yml` to use                                            |
-| `--output-path`   |       | Path to write plan output. Use local directory where the plan result will be stored |
+| `--target` |       | Target from `manifest.yml` to use (bundles project identifier + templating config)  |
+| `--save-output`   |       | Save the plan output to a file |
+
+> **Note:** The output path is always `out/` relative to the project directory. Add `out/` to your `.gitignore` to avoid pushing local output files to git.
 
 #### Examples
 
 ```bash
 # Plan from current directory
-snow dcm plan MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection
+snow dcm plan MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --save-output
 
-# Plan with a specific configuration
-snow dcm plan MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --configuration PROD
-
-# Plan and save output
-snow dcm plan MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --output-path ./out/plan
+# Plan with a specific target
+snow dcm plan MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --target PROD --save-output
 ```
 
-#### Recommended Output Path
-
-Use `<project_root>/out/plan` to store plan output in a consistent location.
+> **Always use `--save-output`** when running `snow dcm plan`. Without it, `out/plan_result.json` is not written and the agent cannot read or verify the plan results.
 
 #### Understanding Plan Output
 
@@ -327,11 +286,11 @@ Contains an array of `operations`, each being one of:
 
 #### ⚠️ CRITICAL: Reading and Parsing Plan Output
 
-**After running `plan`, you MUST read and parse `out/plan/plan_metadata.json` to verify the results.**
+**After running `plan`, you MUST read and parse `out/plan_result.json` to verify the results.**
 
 This is NOT optional. The agent MUST:
 
-1. **Read the file**: `out/plan/plan_metadata.json`
+1. **Read the file**: `out/plan_result.json`
 2. **Parse the JSON** and check:
    - What is the `status`? (`SUCCESS` or `PLAN_FAILED`)
    - If `PLAN_FAILED`, what is the `error` message?
@@ -341,13 +300,13 @@ This is NOT optional. The agent MUST:
 
 **If plan output already exists** and user asks for a summary or to proceed with deployment:
 
-- **Do NOT rerun plan** - instead, read the existing `out/plan/plan_metadata.json`
+- **Do NOT rerun plan** - instead, read the existing `out/plan_result.json`
 - Only rerun plan if user explicitly requests it or if definitions have changed
 
 #### Agent Guidance for Plan
 
 1. **Always read and parse the output JSON**: This is mandatory, not optional
-2. **Reuse existing plan output**: If `out/plan/plan_metadata.json` exists and is current, read it instead of rerunning
+2. **Reuse existing plan output**: If `out/plan_result.json` exists and is current, read it instead of rerunning
 3. **Always run plan before deploy**: Never skip the planning step
 4. **Highlight destructive changes**: Pay special attention to `DROP` and `ALTER` operations
 5. **Summarize changes clearly**: Group changes by type (creates, alters, drops) and importance
@@ -363,7 +322,7 @@ This is NOT optional. The agent MUST:
    ⚠️  ALTER: 1 object (1 table - column type change)
    🚨 DROP: 1 object (1 table)
    ```
-8. Since plan output contains rendered jinja, it will also contain definitions folder that will match manifest.yml include_definitions pattern causing failures. The agent should remove the output folder before running the plan command.
+8. Since plan output contains rendered jinja, it will also contain a definitions folder in the output that may cause confusion. The agent should remove the output folder before running the plan command.
 
 ---
 
@@ -388,7 +347,7 @@ snow dcm preview <identifier> -c <connection> --object <fqn> [options]
 | Option            | Short | Required | Description                                                                      |
 | ----------------- | ----- | -------- | -------------------------------------------------------------------------------- |
 | `--object`        |       | **Yes**  | Fully qualified name of the object to preview (e.g., `MY_DB.MY_SCHEMA.MY_TABLE`) |
-| `--configuration` |       | No       | Configuration to use                                                             |
+| `--target` |       | No       | Target to use (from manifest.yml)                                                |
 | `--limit`         |       | No       | Maximum number of rows to return                                                 |
 
 #### Examples
@@ -400,8 +359,8 @@ snow dcm preview MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --object MY_DB.PUBLI
 # Preview with row limit
 snow dcm preview MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --object MY_DB.PUBLIC.ORDERS --limit 10
 
-# Preview with specific configuration
-snow dcm preview MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --configuration DEV --object MY_DB.PUBLIC.MY_VIEW --limit 5
+# Preview with specific target
+snow dcm preview MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --target DEV --object MY_DB.PUBLIC.MY_VIEW --limit 5
 ```
 
 #### Agent Guidance for Preview
@@ -423,6 +382,7 @@ Applies changes defined in the DCM project to Snowflake. This command executes t
 snow dcm deploy <identifier> -c <connection> [options]
 ```
 
+
 #### Arguments
 
 | Argument     | Required | Description                       |
@@ -433,7 +393,7 @@ snow dcm deploy <identifier> -c <connection> [options]
 
 | Option            | Short | Description                                        |
 | ----------------- | ----- | -------------------------------------------------- |
-| `--configuration` |       | Configuration from `manifest.yml` to use           |
+| `--target` |       | Target from `manifest.yml` to use (bundles project identifier + templating config) |
 | `--alias`         |       | Alias for the deployment (for tracking/management) |
 
 #### Examples
@@ -442,8 +402,8 @@ snow dcm deploy <identifier> -c <connection> [options]
 # Deploy from current directory
 snow dcm deploy MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection
 
-# Deploy with a specific configuration
-snow dcm deploy MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --configuration PROD
+# Deploy with a specific target
+snow dcm deploy MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --target PROD
 
 # Deploy with an alias for tracking
 snow dcm deploy MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --alias "release-v1.2.0"
@@ -491,6 +451,7 @@ Lists all deployments for a given DCM project.
 ```bash
 snow dcm list-deployments <identifier> -c <connection>
 ```
+
 
 #### Arguments
 
@@ -583,6 +544,7 @@ Manually refreshes dynamic tables defined in the DCM project.
 snow dcm refresh <identifier> -c <connection>
 ```
 
+
 #### Arguments
 
 | Argument     | Required | Description                       |
@@ -613,25 +575,18 @@ Runs expectation tests on tables, views, and dynamic tables defined in the DCM p
 snow dcm test <identifier> -c <connection> [options]
 ```
 
+
 #### Arguments
 
 | Argument     | Required | Description                       |
 | ------------ | -------- | --------------------------------- |
 | `identifier` | Yes      | The identifier of the DCM project |
 
-#### Options
-
-| Option          | Description                                                         |
-| --------------- | ------------------------------------------------------------------- |
-| `--output-path` | Directory to save test result files (defaults to current directory) |
-
 #### Examples
 
 ```bash
 # Run tests with default output
 snow dcm test MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection
-
-snow dcm test MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --output-path ./out/test
 ```
 
 #### Use Cases
@@ -664,8 +619,7 @@ A typical DCM workflow follows these steps:
                               ▼
 ┌───────────────────────────────────────────────────────────────┐
 │  3. ANALYZE - Validate the project structure                  │
-│     snow dcm analyze MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection│
-│     --output-path ./out/analyze                               │
+│     snow dcm raw-analyze MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection│
 │                                                               │
 │     ↳ Review errors and warnings                              │
 │     ↳ Explore dependencies and lineage                        │
@@ -682,7 +636,7 @@ A typical DCM workflow follows these steps:
 ┌───────────────────────────────────────────────────────────────┐
 │  5. PLAN - Preview what changes will be made                  │
 │     snow dcm plan MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection  │
-│     --configuration DEV --output-path ./out/plan              │
+│     --target DEV --save-output                                │
 │                                                               │
 │     ↳ Review CREATE/ALTER/DROP operations                     │
 │     ↳ Pay attention to destructive changes                    │
@@ -699,7 +653,7 @@ A typical DCM workflow follows these steps:
 ┌───────────────────────────────────────────────────────────────┐
 │  7. DEPLOY - Apply changes (requires confirmation!)           │
 │     snow dcm deploy MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection│
-│     --configuration DEV --alias "v1.0.0"                      │
+│     --target DEV --alias "v1.0.0"                      │
 │                                                               │
 │     ⚠️ ALWAYS get user confirmation first                     │
 └───────────────────────────────────────────────────────────────┘
@@ -717,11 +671,10 @@ A typical DCM workflow follows these steps:
 ┌───────────────────────────────────────────────────────────────┐
 │  9. TEST - Run data quality tests                             │
 │     snow dcm test MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection  │
-│     --output-path ./out/test                                  │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-**Exploring Existing Projects:** When working with an existing DCM project, use `list-deployments` to understand the project's deployment history. This helps you see what configurations have been deployed, when they were applied, and what aliases were used—useful context before making changes.
+**Exploring Existing Projects:** When working with an existing DCM project, use `list-deployments` to understand the project's deployment history. This helps you see what targets have been deployed, when they were applied, and what aliases were used—useful context before making changes.
 
 ---
 
@@ -732,7 +685,8 @@ These options are available on most commands:
 | Option               | Description                             |
 | -------------------- | --------------------------------------- |
 | `-c`, `--connection` | **Required**: Snowflake connection name |
-| `--configuration`    | Configuration from `manifest.yml`       |
+| `--target`    | Target from `manifest.yml` (bundles project identifier + templating config) |
+| `--save-output`      | Save plan output artifacts to `out/` (plan command only) |
 
 ---
 
@@ -794,7 +748,7 @@ CREATE TABLE MY_DB.RAW.CUSTOMERS (
     EMAIL VARCHAR(255)
 );
 
--- DCM definition to adopt it (in definitions/tables.sql)
+-- DCM definition to adopt it (in sources/definitions/tables.sql)
 DEFINE TABLE MY_DB.RAW.CUSTOMERS (
     CUSTOMER_ID NUMBER(38,0) NOT NULL,
     NAME VARCHAR(255),

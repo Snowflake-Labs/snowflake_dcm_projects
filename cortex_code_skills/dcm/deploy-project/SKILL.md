@@ -32,16 +32,13 @@ Before deploying, ensure:
 If analyze hasn't been run recently:
 
 ```bash
-snow dcm analyze <identifier> -c <connection> \
-    --configuration <config> \
-    --output-path ./out/analyze
+snow dcm raw-analyze <identifier> -c <connection> \
+    --target <target> \
 ```
 
 #### ⚠️ CRITICAL: Read and Parse the Output
 
-**You MUST read and parse `out/analyze/analyze_output.json`.**
-
-For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output Files](../SKILL.md#️-critical-reading-output-files)
+**You MUST read and parse command output.**
 
 **Do NOT proceed if there are errors.**
 
@@ -49,22 +46,22 @@ For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output File
 
 **Check if plan output already exists:**
 
-- If `out/plan/plan_metadata.json` exists and is current, **read it instead of rerunning**
+- If `out/plan_result.json` exists and is current, **read it instead of rerunning**
 - Only rerun plan if explicitly requested by user or if definitions have changed
 
 If plan needs to be run:
 
 ```bash
 snow dcm plan <identifier> -c <connection> \
-    --configuration <config> \
-    --output-path ./out/plan
+    --target <target> \
+    --save-output
 ```
 
 #### ⚠️ CRITICAL: Read and Parse the Output
 
-**You MUST read and parse `out/plan/plan_metadata.json`.**
+**You MUST read and parse `out/plan_result.json`.**
 
-For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output Files](../SKILL.md#️-critical-reading-output-files)
+For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output Files](../SKILL.md#critical-reading-output-files)
 
 **Do NOT proceed to deployment without parsing the plan output.**
 
@@ -77,7 +74,7 @@ Parse the plan output and present a clear summary:
 ║                    📊 DEPLOYMENT PLAN                        ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ Project:       <DATABASE.SCHEMA.PROJECT_NAME>                ║
-║ Configuration: <config_name>                                 ║
+║ Target:        <target_name>                                  ║
 ║ Connection:    <connection_name>                             ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
@@ -129,7 +126,7 @@ If yes:
 ```bash
 snow dcm preview <identifier> -c <connection> \
     --object <fully.qualified.object.name> \
-    --configuration <config> \
+    --target <target> \
     --limit 10
 ```
 
@@ -176,7 +173,7 @@ This is especially useful for:
 
 ```bash
 snow dcm deploy <identifier> -c <connection> \
-    --configuration <config> \
+    --target <target> \
     --alias "<user-provided-alias-or-timestamp>"
 ```
 
@@ -223,8 +220,7 @@ If the project has tests and user wants to run them:
 2. **Run tests:**
 
    ```bash
-   snow dcm test <identifier> -c <connection> \
-       --output-path ./out/test
+   snow dcm test <identifier> -c <connection> 
    ```
 
 3. **Report test results** - Summarize pass/fail status
@@ -283,7 +279,7 @@ If deployment partially succeeds:
 
 | Command                     | Purpose                       |
 | --------------------------- | ----------------------------- |
-| `snow dcm analyze`          | Validate project, find errors |
+| `snow dcm raw-analyze`          | Validate project, find errors |
 | `snow dcm plan`             | Preview what will change      |
 | `snow dcm preview`          | View sample data from objects |
 | `snow dcm deploy`           | Apply changes to Snowflake    |
@@ -294,8 +290,8 @@ If deployment partially succeeds:
 ### Always Include
 
 - `-c <connection>`: Connection name
-- `--configuration <config>`: Configuration name (if using configurations)
-- `--output-path <path>`: For analyze/plan/test output
+- `--target <target>`: Target name from manifest.yml (bundles project identifier + templating config)
+- `--save-output`: [important!] For plan command only
 
 ### Recommended
 

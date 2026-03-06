@@ -67,7 +67,7 @@ ATTACH DATA METRIC FUNCTION MY_DB.RAW.INVENTORY_SPREAD
 
 DCM definitions support Jinja2 templating, enabling dynamic generation of SQL based on variables, loops, conditionals, and macros. This allows for DRY (Don't Repeat Yourself) definitions and environment-specific configurations.
 
-> **Note**: The examples below demonstrate Jinja patterns. Variable values are injected into definitions at runtime—how variables are exposed to definitions is covered separately in project configuration documentation.
+> **Note**: The examples below demonstrate Jinja patterns. Variable values come from the `templating` section in `manifest.yml` — resolved by merging `templating.defaults` with the active `templating.configurations` entry selected by the target's `templating_config`. See `reference/project_structure.md` for details.
 
 ### Variable Substitution
 
@@ -135,7 +135,7 @@ DEFINE ROLE {{ role_name | upper }}_ADMIN;
 
 ### Macros
 
-> **⚠️ Limited Scope**: Macros are **only accessible within the same file** where they are defined. They cannot be imported or referenced from other definition files. Because of this limitation, **the use of macros is generally discouraged** in DCM projects—prefer using loops and conditionals directly, or restructure definitions to avoid cross-file dependencies.
+> **⚠️ Inline Macro Scope**: Macros defined inline within a definition file are **only accessible within that same file**. They cannot be imported or referenced from other definition files. For macros that need to be shared across multiple files, place them in `sources/macros/` — macros in that directory are accessible from all definition files. See `reference/project_structure.md` for details on the macros directory.
 
 Define reusable template blocks with `{% macro %}...{% endmacro %}`:
 
@@ -170,6 +170,68 @@ Define reusable template blocks with `{% macro %}...{% endmacro %}`:
 
 {% endfor %}
 ```
+
+### Jinja Dictionaries
+
+DCM's Jinja templating engine supports dictionaries, enabling granular control over per-resource configuration without repetitive hard-coded scripts.
+
+#### Defining Dictionaries in manifest.yml
+
+Dictionaries are defined as list items with named properties in `templating.configurations`:
+
+```yaml
+templating:
+  defaults:
+    user: "GITHUB_ACTIONS_SERVICE_USER"
+    wh_size: "X-SMALL"
+  configurations:
+    PROD:
+      env_suffix: ""
+      project_owner_role: "DCM_PROD_DEPLOYER"
+      teams:
+        - name: "Marketing"
+          wh_size: "MEDIUM"
+          data_retention_days: 14
+          needs_sandbox_schema: true
+        - name: "Finance"
+          wh_size: "X-LARGE"
+          data_retention_days: 90
+          needs_sandbox_schema: false
+        - name: "HR"
+          data_retention_days: 30
+          needs_sandbox_schema: false
+```
+
+#### Using Dictionaries in SQL Templates
+
+Loop through dictionary items and access their properties:
+
+```sql
+{% for team in teams %}
+{% set team_name = team.name | upper %}
+
+DEFINE SCHEMA MY_DB{{env_suffix}}.{{team_name}}
+    COMMENT = 'Team schema'
+    DATA_RETENTION_TIME_IN_DAYS = {{ team.data_retention_days }};
+
+DEFINE TABLE MY_DB{{env_suffix}}.{{team_name}}.PRODUCTS(
+    ITEM_NAME VARCHAR,
+    ITEM_ID VARCHAR
+);
+
+{% if team.needs_sandbox_schema | default(false) %}
+DEFINE SCHEMA MY_DB{{env_suffix}}.{{team_name}}_SANDBOX
+    COMMENT = 'Sandbox schema'
+    DATA_RETENTION_TIME_IN_DAYS = 1;
+{% endif %}
+
+{% endfor %}
+```
+
+#### Dictionary Limitations
+
+- Dictionaries can be defined in `manifest.yml` but **cannot be overridden at runtime** via `--variable`
+- Individual scalar values within dictionaries cannot be selectively overridden
 
 ### Complete Jinja Example
 

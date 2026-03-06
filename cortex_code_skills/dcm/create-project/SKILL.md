@@ -62,8 +62,9 @@ The user might provide some of this information in the initial prompt, so ask cl
    **→ Load** [../dcm-roles-and-grants/SKILL.md](../dcm-roles-and-grants/SKILL.md) for recommended patterns.
 
 3. **Multi-environment support?**
-   - Will this deploy to DEV/PROD separately?
+   - Will this deploy to DEV/PROD separately? (requires separate targets in manifest)
    - What differs between environments? (database names, warehouse sizes, users)
+   - Each target can point to a different DCM project identifier
 
 ### Step 2: Verify Prerequisites
 
@@ -96,41 +97,73 @@ Refer to [../reference/project_structure.md](../reference/project_structure.md) 
 
 ### Step 5: Create manifest.yml
 
-Use ONLY the fields shown in these examples. The deployment target is specified via CLI commands (`snow dcm plan DB.SCHEMA.PROJECT`), not in the manifest.
+Use ONLY the fields shown in these examples. See [../reference/project_structure.md](../reference/project_structure.md) for the full v2 schema.
 
-**Without configurations (single environment):**
-
-```yaml
-manifest_version: 1
-include_definitions:
-  - definitions/.*
-type: DCM_PROJECT
-```
-
-**With configurations (multi-environment):**
+**Without templating (single environment):**
 
 ```yaml
-manifest_version: 1
-include_definitions:
-  - definitions/.*
+manifest_version: 2
 type: DCM_PROJECT
+default_target: 'DEV'
 
-configurations:
+targets:
   DEV:
-    env: "DEV"
-    wh_size: "X-SMALL"
-    users:
-      - "DEV_USER"
-  PROD:
-    env: "PROD"
-    wh_size: "LARGE"
-    users:
-      - "PROD_SERVICE_USER"
+    account_identifier: MY_ACCOUNT
+    project_name: 'DATABASE.SCHEMA.PROJECT_NAME'
+    project_owner: DCM_DEVELOPER
 ```
+
+**With templating (multi-environment):**
+
+```yaml
+manifest_version: 2
+type: DCM_PROJECT
+default_target: 'DEV'
+
+targets:
+  DEV:
+    account_identifier: DEV_ACCOUNT
+    project_name: 'DATABASE.SCHEMA.PROJECT_NAME_DEV'
+    project_owner: DCM_DEVELOPER
+    templating_config: 'DEV'
+  PROD:
+    account_identifier: PROD_ACCOUNT
+    project_name: 'DATABASE.SCHEMA.PROJECT_NAME'
+    project_owner: DCM_PROD_DEPLOYER
+    templating_config: 'PROD'
+
+templating:
+  defaults:
+    wh_size: 'XSMALL'
+    users:
+      - 'DEV_USER'
+  configurations:
+    DEV:
+      wh_size: 'XSMALL'
+      users:
+        - 'DEV_USER'
+    PROD:
+      wh_size: 'LARGE'
+      users:
+        - 'PROD_SERVICE_USER'
+```
+
+> **Best Practice:** Embed the project identifier in manifest targets rather than passing it as a CLI argument. The `--target` flag selects a target, which resolves both the project name and templating configuration.
+
+> **Finding values for target fields:**
+> - `account_identifier`: Run `SELECT CURRENT_ACCOUNT()` in the target Snowflake account
+> - `project_owner`: The role that will own the DCM project object. Run `DESCRIBE DCM PROJECT <identifier>` on an existing project to see its owner, or choose the role you'll use for deployments
 
 ### Step 6: Clarify Object Definitions
 
 Before writing definitions, **provide a proposed structure and get confirmation from the user**
+
+### Safe Defaults for Access Control
+
+When creating a project from scratch, keep access control minimal unless the user explicitly requests roles and grants:
+
+- **If the user does NOT mention roles/grants/users:** Do NOT create an access.sql file. Omit roles and grants entirely.
+- **If the user requests roles, grants, or access control:** You **MUST** load [../dcm-roles-and-grants/SKILL.md](../dcm-roles-and-grants/SKILL.md) before writing any access control definitions. That sub-skill covers grant syntax constraints, stage privilege types, warehouse grant workarounds, and unsupported patterns that will cause plan failures if used incorrectly.
 
 ### Step 7: Write Definition Files
 
@@ -143,16 +176,13 @@ Refer to [../reference/syntax.md](../reference/syntax.md) for the syntax of the 
 Run analyze to validate the project:
 
 ```bash
-snow dcm analyze <identifier> -c <connection> \
-    --configuration <config> \
-    --output-path ./out/analyze
+snow dcm raw-analyze <identifier> -c <connection> \
+    --target <target>
 ```
 
 #### ⚠️ CRITICAL: Read and Parse the Output
 
-**You MUST read and parse `out/analyze/analyze_output.json`.**
-
-For detailed instructions on reading output files, see: [Parent SKILL.md - Critical: Reading Output Files](../SKILL.md#️-critical-reading-output-files)
+**You MUST read and parse command output.**
 
 ### Step 9: Fix Any Errors
 
@@ -191,11 +221,25 @@ Keep related objects together:
 - All tables in one file, or
 - Group by business domain (sales.sql, marketing.sql, etc.)
 
-### Configuration Variables
+### Global Macros
 
-Common variables to define:
+If your project uses Jinja macros shared across multiple definition files, place them in `sources/macros/`:
 
-- `env`: Environment identifier (DEV, PROD)
+    project/
+    ├── manifest.yml
+    └── sources/
+        ├── definitions/
+        │   └── *.sql
+        └── macros/
+            └── shared_macros.sql
+
+Unlike macros defined inline in definition files (which are scoped to that file only), macros in `sources/macros/` are accessible from all definition files.
+
+### Templating Variables
+
+Common variables to define under `templating.defaults` and `templating.configurations`:
+
+- `env_suffix`: Environment suffix for object names (`_DEV`, `""`)
 - `wh_size`: Warehouse size
 - `users`: List of users for grants
 - `teams`: List of team/schema names
