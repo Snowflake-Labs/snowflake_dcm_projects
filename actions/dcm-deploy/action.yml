@@ -29,6 +29,7 @@
 #           with:
 #             target: DCM_STAGE
 #             project-path: Quickstarts/DCM_Project_Quickstart_1/
+#             snowflake-user: ${{ secrets.SNOWFLAKE_USER }}
 #
 # Example usage (full pipeline with testing):
 #
@@ -36,6 +37,7 @@
 #     with:
 #       target: DCM_STAGE
 #       project-path: Quickstarts/DCM_Project_Quickstart_1/
+#       snowflake-user: ${{ secrets.SNOWFLAKE_USER }}
 #       allow-drops: "false"
 #       test-expectations: "true"
 #       comment-on-pr: "true"
@@ -83,10 +85,10 @@ inputs:
 outputs:
   deploy-result:
     description: "'success' or 'failure'"
-    value: ${{ steps.deploy.outputs.result }}
+    value: ${{ steps.deploy.outputs.result || 'failure' }}
   test-result:
     description: "'success', 'failure', or 'skipped'"
-    value: ${{ steps.test.outputs.result }}
+    value: ${{ steps.test.outputs.result || 'skipped' }}
 
 runs:
   using: "composite"
@@ -193,21 +195,21 @@ runs:
         CONFIG_NAME=$(yq eval ".targets.$TARGET.templating_config" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
 
         # Build --variable flags from manifest defaults + config overrides (scalar values only)
-        VARIABLE_FLAGS=""
+        VARIABLE_ARGS=()
         for KEY in $(yq eval '.templating.defaults | keys | .[]' "$MANIFEST_PATH"); do
           VALUE=$(yq eval ".templating.defaults.$KEY" "$MANIFEST_PATH")
           if [ "$(echo "$VALUE" | yq eval 'tag')" != "!!seq" ] && [ "$(echo "$VALUE" | yq eval 'tag')" != "!!map" ]; then
-            VARIABLE_FLAGS="$VARIABLE_FLAGS --variable \"$KEY=$(echo "$VALUE" | sed 's/"//g' | sed "s/'//g")\""
+            VARIABLE_ARGS+=(--variable "$KEY=$(echo "$VALUE" | sed 's/"//g' | sed "s/'//g")")
           fi
         done
         for KEY in $(yq eval ".templating.configurations.$CONFIG_NAME | keys | .[]" "$MANIFEST_PATH"); do
           VALUE=$(yq eval ".templating.configurations.$CONFIG_NAME.$KEY" "$MANIFEST_PATH")
           if [ "$(echo "$VALUE" | yq eval 'tag')" != "!!seq" ] && [ "$(echo "$VALUE" | yq eval 'tag')" != "!!map" ]; then
-            VARIABLE_FLAGS="$VARIABLE_FLAGS --variable \"$KEY=$(echo "$VALUE" | sed 's/"//g' | sed "s/'//g")\""
+            VARIABLE_ARGS+=(--variable "$KEY=$(echo "$VALUE" | sed 's/"//g' | sed "s/'//g")")
           fi
         done
 
-        echo "Resolved variables: $VARIABLE_FLAGS"
+        echo "Resolved variables: ${VARIABLE_ARGS[*]}"
 
         # Run all .sql files alphabetically
         SCRIPT_COUNT=0
@@ -218,7 +220,7 @@ runs:
           echo "Running: $FILENAME"
 
           set +e
-          SQL_OUTPUT=$(eval snow sql -f "$SQL_FILE" $VARIABLE_FLAGS --enable-templating JINJA -x 2>&1)
+          SQL_OUTPUT=$(snow sql -f "$SQL_FILE" "${VARIABLE_ARGS[@]}" --enable-templating JINJA -x 2>&1)
           EXIT_CODE=$?
           set -e
 

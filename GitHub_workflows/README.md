@@ -75,7 +75,7 @@ These are **repository-level** variables, shared across all environments. If you
 
 ### 4. Configure Authentication
 
-The actions authenticate using the [Snowflake CLI GitHub Action](https://github.com/snowflakedb/snowflake-cli-action) (`snowflakedb/snowflake-cli-action@v2.0`). **OIDC is the recommended and default approach** — the actions call the CLI action with `use-oidc: true` internally.
+The actions authenticate using the [Snowflake CLI GitHub Action](https://github.com/snowflakedb/snowflake-cli-action) (`snowflakedb/snowflake-cli-action@v2.0.1`). **OIDC is the recommended and default approach** — the actions call the CLI action with `use-oidc: true` internally.
 
 #### OIDC (recommended — used by default)
 
