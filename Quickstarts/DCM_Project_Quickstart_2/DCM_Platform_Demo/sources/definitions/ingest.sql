@@ -5,8 +5,8 @@ define stage DCM_DEMO_2.INGEST.DCM_SAMPLE_DATA
     comment = 'for csv files with sample data to demo DCM Pipeline project';
 
 define task DCM_DEMO_2.INGEST.LOAD_NEW_DATA
-schedule='USING CRON 15 8-18 * * MON-FRI CET'
-comment = 'loading sample data to demo DCM Pipeline project'
+    schedule='USING CRON 15 8-18 * * MON-FRI CET'
+    comment = 'loading sample data to demo DCM Pipeline project'
 as 
 begin
         
@@ -130,7 +130,7 @@ begin
     file_format = DCM_DEMO_2.INGEST.CSV_FORMAT
     on_error = continue;
     
-    call SYSTEM$SET_RETURN_VALUE('✅ random {{ingest_perc}}% of raw dataset written into all dimension tables');
+    call SYSTEM$SET_RETURN_VALUE('✅ raw dataset loaded into all staging tables');
 end;
 
 

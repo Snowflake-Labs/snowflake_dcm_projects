@@ -28,12 +28,33 @@ For complete, ready-to-use workflow examples that compose these actions, see the
 
 All actions authenticate to Snowflake using the [`snowflakedb/snowflake-cli-action@v2.0`](https://github.com/snowflakedb/snowflake-cli-action) with **OIDC** (OpenID Connect) enabled. Each action calls this internally — you do not need to add a separate authentication step in your workflow.
 
-**OIDC is the recommended approach.** It uses GitHub's built-in identity tokens so no passwords or private keys need to be stored as secrets. To use OIDC:
+**OIDC is the recommended approach.** It uses GitHub's built-in identity tokens via Workload Identity Federation so no passwords or private keys need to be stored as secrets. To use OIDC:
 
-1. Create a Snowflake service user and configure a security integration that trusts GitHub's OIDC provider
-2. Create a GitHub Environment for each DCM target (e.g. `DCM_STAGE`, `DCM_PROD_US`)
-3. Set the `SNOWFLAKE_USER` repository variable to the service user name
-4. Grant the workflow `id-token: write` permission
+1. Create a Snowflake service user with OIDC workload identity. The `SUBJECT` must match exactly what GitHub sends — case-sensitive, no wildcards. Since these actions use GitHub Environments, use the environment-based subject format:
+
+   ```sql
+   CREATE USER SVC_GITHUB_ACTIONS
+     TYPE = SERVICE
+     DEFAULT_ROLE = 'PUBLIC'
+     COMMENT = 'GitHub Actions service user for CI/CD via OIDC'
+     WORKLOAD_IDENTITY = (
+       TYPE = OIDC
+       ISSUER = 'https://token.actions.githubusercontent.com'
+       SUBJECT = 'repo:<owner>/<repo>:environment:<env_name>'
+     );
+   ```
+
+   Replace `<owner>/<repo>` with your GitHub repository and `<env_name>` with the GitHub Environment name (e.g. `DCM_STAGE`). If you have multiple environments, you will need a separate service user per environment or use [subject claim customization](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect#customizing-the-subject-claims).
+
+2. Grant the service user the role specified as `project_owner` in your manifest:
+
+   ```sql
+   GRANT ROLE MY_DEPLOYER_ROLE TO USER SVC_GITHUB_ACTIONS;
+   ```
+
+3. Create a GitHub Environment for each DCM target (e.g. `DCM_STAGE`, `DCM_PROD_US`) — the environment name must match the `SUBJECT` claim
+4. Set the `SNOWFLAKE_USER` repository variable to the service user name
+5. Grant the workflow `id-token: write` permission
 
 **PAT and key-pair authentication** are also supported. If you cannot use OIDC, set the appropriate environment variables in your workflow before calling the actions:
 

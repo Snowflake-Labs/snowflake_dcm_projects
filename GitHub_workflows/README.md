@@ -89,7 +89,7 @@ To use OIDC:
 
 No secrets are required — the GitHub environment's OIDC token handles authentication automatically.
 
-<!-- TODO: Link to detailed OIDC setup guide -->
+The actions handle authentication internally — see the [Actions README Authentication section](../actions/README.md#authentication) for full setup instructions (OIDC, PAT, and key-pair options).
 
 #### Alternative: PAT / Password
 
